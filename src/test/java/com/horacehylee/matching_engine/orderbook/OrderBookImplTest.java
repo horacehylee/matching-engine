@@ -39,7 +39,7 @@ class OrderBookImplTest {
 
         orderBook.addOrder(order);
 
-        assertIterableEquals(Collections.singletonList(order), orderBook.getAskOrders());
+        assertIterableEquals(List.of(order), orderBook.getAskOrders());
         assertIterableEquals(Collections.emptyList(), orderBook.getBidOrders());
     }
 
@@ -64,13 +64,13 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        assertIterableEquals(Arrays.asList(order, order2), orderBook.getAskOrders());
+        assertIterableEquals(List.of(order, order2), orderBook.getAskOrders());
 
         final IOrderBookSlice slice = orderBook.getSlice(100L);
         assertEquals(30L, slice.getVolume());
         assertEquals(Side.ASK, slice.getSide());
         assertEquals(100L, slice.getPrice());
-        assertIterableEquals(Arrays.asList(order, order2), slice.getOrders());
+        assertIterableEquals(List.of(order, order2), slice.getOrders());
     }
 
     @Test
@@ -121,7 +121,7 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        assertIterableEquals(Arrays.asList(order2, order), orderBook.getAskOrders());
+        assertIterableEquals(List.of(order2, order), orderBook.getAskOrders());
     }
 
     @Test
@@ -145,7 +145,7 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        assertIterableEquals(Arrays.asList(order2, order), orderBook.getBidOrders());
+        assertIterableEquals(List.of(order2, order), orderBook.getBidOrders());
         assertIterableEquals(Collections.emptyList(), orderBook.getAskOrders());
 
         final IOrderBookSlice slice = orderBook.getSlice(100L);
@@ -202,7 +202,7 @@ class OrderBookImplTest {
         orderBook.cancelOrder(id);
         orderBook.addOrder(order);
 
-        assertIterableEquals(Collections.singletonList(order), orderBook.getAskOrders());
+        assertIterableEquals(List.of(order), orderBook.getAskOrders());
     }
 
     @Test
@@ -229,7 +229,7 @@ class OrderBookImplTest {
                         .withQuantity(quantity)
                         .withSide(Side.ASK)
                         .build();
-        assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+        assertIterableEquals(List.of(expectedOrder), orderBook.getAskOrders());
 
         assertThrows(
                 UnknownPriceException.class,
@@ -265,7 +265,7 @@ class OrderBookImplTest {
                         .withQuantity(newQuantity)
                         .withSide(Side.ASK)
                         .build();
-        assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+        assertIterableEquals(List.of(expectedOrder), orderBook.getAskOrders());
         assertEquals(expectedOrder, orderBook.getOrder(id));
 
         final IOrderBookSlice slice = orderBook.getSlice(price);
@@ -297,7 +297,7 @@ class OrderBookImplTest {
                         .withQuantity(newQuantity)
                         .withSide(Side.ASK)
                         .build();
-        assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+        assertIterableEquals(List.of(expectedOrder), orderBook.getAskOrders());
         assertEquals(expectedOrder, orderBook.getOrder(id));
 
         final IOrderBookSlice slice = orderBook.getSlice(price);

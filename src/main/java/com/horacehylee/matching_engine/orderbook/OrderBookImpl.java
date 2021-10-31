@@ -160,8 +160,10 @@ public class OrderBookImpl implements IOrderBook {
 
     private static class OrdersBucket implements Comparable<OrdersBucket> {
         private final long price;
-        private final LinkedHashMap<Long, Order> orders;
         private long volume = 0;
+
+        // Key by price to value of order
+        private final LinkedHashMap<Long, Order> orders;
 
         private OrdersBucket(long price) {
             this.price = price;
