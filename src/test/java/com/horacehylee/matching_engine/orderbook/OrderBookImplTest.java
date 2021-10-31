@@ -185,4 +185,79 @@ class OrderBookImplTest {
 
         assertIterableEquals(Collections.singletonList(order), orderBook.getAskOrders());
     }
+
+    @Test
+    public void testChangeOrderPrice() throws Exception {
+        final long id = OrderIdCounter.get();
+        final Order order =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(100L)
+                        .withQuantity(10L)
+                        .withSide(Side.ASK)
+                        .build();
+        orderBook.addOrder(order);
+
+        final long newPrice = 200L;
+        orderBook.changeOrderPrice(id, newPrice);
+
+        final Order expectedOrder =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(newPrice)
+                        .withQuantity(10L)
+                        .withSide(Side.ASK)
+                        .build();
+        assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+    }
+
+    @Test
+    public void testChangeOrderQuantityIncrease() throws Exception {
+        final long id = OrderIdCounter.get();
+        final Order order =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(100L)
+                        .withQuantity(10L)
+                        .withSide(Side.ASK)
+                        .build();
+        orderBook.addOrder(order);
+
+        final long newQuantity = 20L;
+        orderBook.changeOrderQuantity(id, newQuantity);
+
+        final Order expectedOrder =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(100L)
+                        .withQuantity(newQuantity)
+                        .withSide(Side.ASK)
+                        .build();
+        assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+    }
+
+    @Test
+    public void testChangeOrderQuantityDecrease() throws Exception {
+        final long id = OrderIdCounter.get();
+        final Order order =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(100L)
+                        .withQuantity(10L)
+                        .withSide(Side.ASK)
+                        .build();
+        orderBook.addOrder(order);
+
+        final long newQuantity = 5L;
+        orderBook.changeOrderQuantity(id, newQuantity);
+
+        final Order expectedOrder =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(100L)
+                        .withQuantity(newQuantity)
+                        .withSide(Side.ASK)
+                        .build();
+        assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+    }
 }

@@ -78,10 +78,37 @@ public class OrderBookImpl implements IOrderBook {
     }
 
     @Override
-    public void changeOrderPrice(long orderId, long price) {}
+    public void changeOrderPrice(long orderId, long price) throws UnknownOrderIdException {
+        final Order originalOrder = orderIdMap.get(orderId);
+        cancelOrder(orderId);
+
+        final Order order = Order.copyOfExceptPrice(originalOrder, price);
+        try {
+            addOrder(order);
+        } catch (DuplicateOrderIdException e) {
+            throw new IllegalStateException(
+                    "Duplicate order id \"" + orderId + "\" for changing order price", e);
+        }
+    }
 
     @Override
-    public void changeOrderQuantity(long orderId, long quantity) {}
+    public void changeOrderQuantity(long orderId, long quantity) {
+        final Order originalOrder = orderIdMap.get(orderId);
+        final Order order = Order.copyOfExceptQuantity(originalOrder, quantity);
+        final Side side = order.getSide();
+        final long price = order.getPrice();
+
+        NavigableMap<Long, OrdersBucket> ordersBuckets = getOrdersBucketBySide(side);
+        OrdersBucket ordersBucket = ordersBuckets.get(price);
+        if (ordersBucket == null) {
+            throw new IllegalStateException(
+                    "Orders bucket could not be found for "
+                            + price
+                            + " price for changing quantity for order "
+                            + orderId);
+        }
+        ordersBucket.replace(order);
+    }
 
     @Override
     public List<Order> getAskOrders() {
@@ -124,6 +151,11 @@ public class OrderBookImpl implements IOrderBook {
         public void remove(Order order) {
             orders.remove(order.getOrderId());
             volume -= order.getQuantity();
+        }
+
+        public void replace(Order order) {
+            remove(order);
+            add(order);
         }
 
         @TestOnly

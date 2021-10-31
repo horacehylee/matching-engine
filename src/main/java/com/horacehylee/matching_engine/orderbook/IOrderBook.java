@@ -9,7 +9,7 @@ public interface IOrderBook extends IReadOnlyOrderBook {
 
     void cancelOrder(long orderId) throws UnknownOrderIdException;
 
-    void changeOrderPrice(long orderId, long price);
+    void changeOrderPrice(long orderId, long price) throws UnknownOrderIdException;
 
     void changeOrderQuantity(long orderId, long quantity);
 }

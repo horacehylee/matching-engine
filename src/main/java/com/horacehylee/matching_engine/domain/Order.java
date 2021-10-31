@@ -21,6 +21,14 @@ public class Order {
         return new Order(orderId, price, quantity, side);
     }
 
+    public static Order copyOfExceptPrice(Order other, long price) {
+        return new Order(other.orderId, price, other.quantity, other.side);
+    }
+
+    public static Order copyOfExceptQuantity(Order other, long quantity) {
+        return new Order(other.orderId, other.price, quantity, other.side);
+    }
+
     @Override
     public String toString() {
         return "Order{"
@@ -82,8 +90,7 @@ public class Order {
         private long quantity;
         private Side side;
 
-        private Builder() {
-        }
+        private Builder() {}
 
         public static Builder anOrder() {
             return new Builder();
