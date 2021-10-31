@@ -6,6 +6,7 @@ import com.horacehylee.matching_engine.orderbook.exception.DuplicateOrderIdExcep
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,7 +27,7 @@ public class OrderBookImpl implements IOrderBook {
 
     private OrderBookImpl() {
         this.orderIdMap = new HashMap<>();
-        this.bidOrdersBuckets = new TreeMap<>();
+        this.bidOrdersBuckets = new TreeMap<>(Collections.reverseOrder());
         this.askOrdersBuckets = new TreeMap<>();
     }
 
@@ -87,10 +88,6 @@ public class OrderBookImpl implements IOrderBook {
         @Override
         public int compareTo(@NotNull OrderBookImpl.OrdersBucket o) {
             return Long.compare(this.price, o.price);
-        }
-
-        public long getPrice() {
-            return price;
         }
 
         public void addOrder(Order order) {

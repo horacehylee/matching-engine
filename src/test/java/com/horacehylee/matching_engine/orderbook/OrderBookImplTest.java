@@ -96,7 +96,7 @@ class OrderBookImplTest {
     }
 
     @Test
-    public void testAddOrderOfDiffPrices() throws Exception {
+    public void testAddAskOrderOfDiffPrices_OrdersInAscendingOrder() throws Exception {
         Order order =
                 Order.Builder.anOrder()
                         .withOrderId(OrderIdCounter.get())
@@ -118,5 +118,30 @@ class OrderBookImplTest {
 
         List<Order> askOrders = orderBook.getAskOrders();
         assertIterableEquals(askOrders, Arrays.asList(order2, order));
+    }
+
+    @Test
+    public void testAddBidOrderOfDiffPrices_OrdersInDescendingOrder() throws Exception {
+        Order order =
+                Order.Builder.anOrder()
+                        .withOrderId(OrderIdCounter.get())
+                        .withPrice(100L)
+                        .withQuantity(10L)
+                        .withSide(Side.BID)
+                        .build();
+
+        Order order2 =
+                Order.Builder.anOrder()
+                        .withOrderId(OrderIdCounter.get())
+                        .withPrice(200L)
+                        .withQuantity(20L)
+                        .withSide(Side.BID)
+                        .build();
+
+        orderBook.addOrder(order);
+        orderBook.addOrder(order2);
+
+        List<Order> bidOrders = orderBook.getBidOrders();
+        assertIterableEquals(bidOrders, Arrays.asList(order2, order));
     }
 }
