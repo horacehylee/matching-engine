@@ -5,6 +5,7 @@ import com.horacehylee.matching_engine.domain.Order;
 import com.horacehylee.matching_engine.domain.Side;
 import com.horacehylee.matching_engine.orderbook.exception.DuplicateOrderIdException;
 import com.horacehylee.matching_engine.orderbook.exception.UnknownOrderIdException;
+import com.horacehylee.matching_engine.orderbook.exception.UnknownPriceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -64,6 +65,12 @@ class OrderBookImplTest {
         orderBook.addOrder(order2);
 
         assertIterableEquals(Arrays.asList(order, order2), orderBook.getAskOrders());
+
+        final IOrderBookSlice slice = orderBook.getSlice(100L);
+        assertEquals(30L, slice.getVolume());
+        assertEquals(Side.ASK, slice.getSide());
+        assertEquals(100L, slice.getPrice());
+        assertIterableEquals(Arrays.asList(order, order2), slice.getOrders());
     }
 
     @Test
@@ -139,6 +146,13 @@ class OrderBookImplTest {
         orderBook.addOrder(order2);
 
         assertIterableEquals(Arrays.asList(order2, order), orderBook.getBidOrders());
+        assertIterableEquals(Collections.emptyList(), orderBook.getAskOrders());
+
+        final IOrderBookSlice slice = orderBook.getSlice(100L);
+        assertEquals(10L, slice.getVolume());
+        assertEquals(Side.BID, slice.getSide());
+        assertEquals(100L, slice.getPrice());
+        assertIterableEquals(List.of(order), slice.getOrders());
     }
 
     @Test
@@ -156,6 +170,11 @@ class OrderBookImplTest {
         orderBook.cancelOrder(id);
 
         assertEquals(0, orderBook.getAskOrders().size());
+
+        assertThrows(
+                UnknownPriceException.class,
+                () -> orderBook.getSlice(100L),
+                "Unknown price is \"" + 100L + "\"given");
     }
 
     @Test
@@ -189,77 +208,99 @@ class OrderBookImplTest {
     @Test
     public void testChangeOrderPrice() throws Exception {
         final long id = OrderIdCounter.get();
+        final long originalPrice = 100L;
+        final long newPrice = 200L;
+        final long quantity = 10L;
+
         final Order order =
                 Order.Builder.anOrder()
                         .withOrderId(id)
-                        .withPrice(100L)
-                        .withQuantity(10L)
+                        .withPrice(originalPrice)
+                        .withQuantity(quantity)
                         .withSide(Side.ASK)
                         .build();
         orderBook.addOrder(order);
-
-        final long newPrice = 200L;
         orderBook.changeOrderPrice(id, newPrice);
 
         final Order expectedOrder =
                 Order.Builder.anOrder()
                         .withOrderId(id)
                         .withPrice(newPrice)
-                        .withQuantity(10L)
+                        .withQuantity(quantity)
                         .withSide(Side.ASK)
                         .build();
         assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+
+        assertThrows(
+                UnknownPriceException.class,
+                () -> orderBook.getSlice(originalPrice),
+                "Unknown price is \"" + originalPrice + "\"given");
+
+        final IOrderBookSlice slice = orderBook.getSlice(newPrice);
+        assertEquals(quantity, slice.getVolume());
     }
 
     @Test
     public void testChangeOrderQuantityIncrease() throws Exception {
         final long id = OrderIdCounter.get();
+        final long originalQuantity = 10L;
+        final long newQuantity = 20L;
+        final long price = 100L;
+
         final Order order =
                 Order.Builder.anOrder()
                         .withOrderId(id)
-                        .withPrice(100L)
-                        .withQuantity(10L)
+                        .withPrice(price)
+                        .withQuantity(originalQuantity)
                         .withSide(Side.ASK)
                         .build();
         orderBook.addOrder(order);
 
-        final long newQuantity = 20L;
         orderBook.changeOrderQuantity(id, newQuantity);
 
         final Order expectedOrder =
                 Order.Builder.anOrder()
                         .withOrderId(id)
-                        .withPrice(100L)
+                        .withPrice(price)
                         .withQuantity(newQuantity)
                         .withSide(Side.ASK)
                         .build();
         assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
         assertEquals(expectedOrder, orderBook.getOrder(id));
+
+        final IOrderBookSlice slice = orderBook.getSlice(price);
+        assertEquals(newQuantity, slice.getVolume());
     }
 
     @Test
     public void testChangeOrderQuantityDecrease() throws Exception {
         final long id = OrderIdCounter.get();
+        final long originalQuantity = 10L;
+        final long newQuantity = 5L;
+        final long price = 100L;
+
         final Order order =
                 Order.Builder.anOrder()
                         .withOrderId(id)
-                        .withPrice(100L)
-                        .withQuantity(10L)
+                        .withPrice(price)
+                        .withQuantity(originalQuantity)
                         .withSide(Side.ASK)
                         .build();
         orderBook.addOrder(order);
 
-        final long newQuantity = 5L;
         orderBook.changeOrderQuantity(id, newQuantity);
 
         final Order expectedOrder =
                 Order.Builder.anOrder()
                         .withOrderId(id)
-                        .withPrice(100L)
+                        .withPrice(price)
                         .withQuantity(newQuantity)
                         .withSide(Side.ASK)
                         .build();
         assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
         assertEquals(expectedOrder, orderBook.getOrder(id));
+
+        final IOrderBookSlice slice = orderBook.getSlice(price);
+        assertEquals(newQuantity, slice.getVolume());
     }
 }

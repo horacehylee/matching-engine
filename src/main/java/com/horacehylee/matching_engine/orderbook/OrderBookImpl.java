@@ -4,8 +4,8 @@ import com.horacehylee.matching_engine.domain.Order;
 import com.horacehylee.matching_engine.domain.Side;
 import com.horacehylee.matching_engine.orderbook.exception.DuplicateOrderIdException;
 import com.horacehylee.matching_engine.orderbook.exception.UnknownOrderIdException;
+import com.horacehylee.matching_engine.orderbook.exception.UnknownPriceException;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.TestOnly;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -115,20 +115,36 @@ public class OrderBookImpl implements IOrderBook {
     @Override
     public List<Order> getAskOrders() {
         return askOrdersBuckets.values().stream()
-                .flatMap(bucket -> bucket.getAll().stream())
+                .flatMap(bucket -> bucket.getOrders().stream())
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<Order> getBidOrders() {
         return bidOrdersBuckets.values().stream()
-                .flatMap(bucket -> bucket.getAll().stream())
+                .flatMap(bucket -> bucket.getOrders().stream())
                 .collect(Collectors.toList());
     }
 
     @Override
     public Order getOrder(long orderId) throws UnknownOrderIdException {
         return getOrderById(orderId);
+    }
+
+    @Override
+    public IOrderBookSlice getSlice(long price) throws UnknownPriceException {
+        OrdersBucket ordersBucket;
+        Side side;
+        if (bidOrdersBuckets.containsKey(price)) {
+            ordersBucket = bidOrdersBuckets.get(price);
+            side = Side.BID;
+        } else if (askOrdersBuckets.containsKey(price)) {
+            ordersBucket = askOrdersBuckets.get(price);
+            side = Side.ASK;
+        } else {
+            throw new UnknownPriceException(price);
+        }
+        return new OrderBookSlice(side, price, ordersBucket.getVolume(), ordersBucket.getOrders());
     }
 
     private NavigableMap<Long, OrdersBucket> getOrdersBucketBySide(Side side) {
@@ -167,11 +183,45 @@ public class OrderBookImpl implements IOrderBook {
             volume -= order.getQuantity();
         }
 
-        @TestOnly
-        public List<Order> getAll() {
+        public List<Order> getOrders() {
             return List.copyOf(orders.values());
         }
 
+        public long getVolume() {
+            return volume;
+        }
+    }
+
+    private static class OrderBookSlice implements IOrderBookSlice {
+
+        private final Side side;
+        private final long price;
+        private final long volume;
+        private final List<Order> orders;
+
+        private OrderBookSlice(Side side, long price, long volume, List<Order> orders) {
+            this.side = side;
+            this.price = price;
+            this.volume = volume;
+            this.orders = orders;
+        }
+
+        @Override
+        public Side getSide() {
+            return side;
+        }
+
+        @Override
+        public long getPrice() {
+            return price;
+        }
+
+        @Override
+        public List<Order> getOrders() {
+            return orders;
+        }
+
+        @Override
         public long getVolume() {
             return volume;
         }
