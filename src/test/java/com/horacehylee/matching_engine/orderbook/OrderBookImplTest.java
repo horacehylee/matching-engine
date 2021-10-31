@@ -42,7 +42,7 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
 
         assertIterableEquals(List.of(order), orderBook.getAskOrders());
-        assertIterableEquals(Collections.emptyList(), orderBook.getBidOrders());
+        assertIterableEquals(List.of(), orderBook.getBidOrders());
 
         assertTrue(orderBook.containsOrder(id));
         assertFalse(orderBook.containsOrder(OrderIdCounter.get()));
@@ -151,7 +151,7 @@ class OrderBookImplTest {
         orderBook.addOrder(order2);
 
         assertIterableEquals(List.of(order2, order), orderBook.getBidOrders());
-        assertIterableEquals(Collections.emptyList(), orderBook.getAskOrders());
+        assertIterableEquals(List.of(), orderBook.getAskOrders());
 
         final IOrderBookSlice slice = orderBook.getSlice(100L);
         assertEquals(10L, slice.getVolume());
