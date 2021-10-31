@@ -52,10 +52,7 @@ public class OrderBookImpl implements IOrderBook {
     @Override
     public void cancelOrder(final long orderId) throws UnknownOrderIdException {
         // TODO: handle cases where order is already partially filled
-        if (!orderIdMap.containsKey(orderId)) {
-            throw new UnknownOrderIdException(orderId);
-        }
-        final Order order = orderIdMap.get(orderId);
+        final Order order = getOrderById(orderId);
         final Side side = order.getSide();
         final long price = order.getPrice();
 
@@ -79,7 +76,7 @@ public class OrderBookImpl implements IOrderBook {
 
     @Override
     public void changeOrderPrice(long orderId, long price) throws UnknownOrderIdException {
-        final Order originalOrder = orderIdMap.get(orderId);
+        final Order originalOrder = getOrderById(orderId);
         cancelOrder(orderId);
 
         final Order order = Order.copyOfExceptPrice(originalOrder, price);
@@ -92,11 +89,12 @@ public class OrderBookImpl implements IOrderBook {
     }
 
     @Override
-    public void changeOrderQuantity(long orderId, long quantity) {
-        final Order originalOrder = orderIdMap.get(orderId);
+    public void changeOrderQuantity(long orderId, long quantity) throws UnknownOrderIdException {
+        final Order originalOrder = getOrderById(orderId);
+        final Side side = originalOrder.getSide();
+        final long price = originalOrder.getPrice();
+
         final Order order = Order.copyOfExceptQuantity(originalOrder, quantity);
-        final Side side = order.getSide();
-        final long price = order.getPrice();
 
         NavigableMap<Long, OrdersBucket> ordersBuckets = getOrdersBucketBySide(side);
         OrdersBucket ordersBucket = ordersBuckets.get(price);
@@ -107,7 +105,11 @@ public class OrderBookImpl implements IOrderBook {
                             + " price for changing quantity for order "
                             + orderId);
         }
-        ordersBucket.replace(order);
+
+        orderIdMap.put(orderId, order);
+
+        ordersBucket.remove(originalOrder);
+        ordersBucket.add(order);
     }
 
     @Override
@@ -124,8 +126,20 @@ public class OrderBookImpl implements IOrderBook {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public Order getOrder(long orderId) throws UnknownOrderIdException {
+        return getOrderById(orderId);
+    }
+
     private NavigableMap<Long, OrdersBucket> getOrdersBucketBySide(Side side) {
         return side == Side.BID ? bidOrdersBuckets : askOrdersBuckets;
+    }
+
+    private Order getOrderById(long orderId) throws UnknownOrderIdException {
+        if (!orderIdMap.containsKey(orderId)) {
+            throw new UnknownOrderIdException(orderId);
+        }
+        return orderIdMap.get(orderId);
     }
 
     private static class OrdersBucket implements Comparable<OrdersBucket> {
@@ -151,11 +165,6 @@ public class OrderBookImpl implements IOrderBook {
         public void remove(Order order) {
             orders.remove(order.getOrderId());
             volume -= order.getQuantity();
-        }
-
-        public void replace(Order order) {
-            remove(order);
-            add(order);
         }
 
         @TestOnly

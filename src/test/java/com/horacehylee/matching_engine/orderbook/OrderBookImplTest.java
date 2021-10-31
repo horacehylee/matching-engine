@@ -234,6 +234,7 @@ class OrderBookImplTest {
                         .withSide(Side.ASK)
                         .build();
         assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+        assertEquals(expectedOrder, orderBook.getOrder(id));
     }
 
     @Test
@@ -259,5 +260,6 @@ class OrderBookImplTest {
                         .withSide(Side.ASK)
                         .build();
         assertIterableEquals(Collections.singletonList(expectedOrder), orderBook.getAskOrders());
+        assertEquals(expectedOrder, orderBook.getOrder(id));
     }
 }

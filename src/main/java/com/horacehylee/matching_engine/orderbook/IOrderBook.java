@@ -11,5 +11,5 @@ public interface IOrderBook extends IReadOnlyOrderBook {
 
     void changeOrderPrice(long orderId, long price) throws UnknownOrderIdException;
 
-    void changeOrderQuantity(long orderId, long quantity);
+    void changeOrderQuantity(long orderId, long quantity) throws UnknownOrderIdException;
 }
