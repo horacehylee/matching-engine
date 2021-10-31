@@ -38,11 +38,8 @@ class OrderBookImplTest {
 
         orderBook.addOrder(order);
 
-        final List<Order> askOrders = orderBook.getAskOrders();
-        final List<Order> bidOrders = orderBook.getBidOrders();
-
-        assertIterableEquals(Collections.singletonList(order), askOrders);
-        assertIterableEquals(Collections.emptyList(), bidOrders);
+        assertIterableEquals(Collections.singletonList(order), orderBook.getAskOrders());
+        assertIterableEquals(Collections.emptyList(), orderBook.getBidOrders());
     }
 
     @Test
@@ -66,8 +63,7 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        final List<Order> askOrders = orderBook.getAskOrders();
-        assertIterableEquals(Arrays.asList(order, order2), askOrders);
+        assertIterableEquals(Arrays.asList(order, order2), orderBook.getAskOrders());
     }
 
     @Test
@@ -118,8 +114,7 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        final List<Order> askOrders = orderBook.getAskOrders();
-        assertIterableEquals(Arrays.asList(order2, order), askOrders);
+        assertIterableEquals(Arrays.asList(order2, order), orderBook.getAskOrders());
     }
 
     @Test
@@ -143,8 +138,7 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        final List<Order> bidOrders = orderBook.getBidOrders();
-        assertIterableEquals(Arrays.asList(order2, order), bidOrders);
+        assertIterableEquals(Arrays.asList(order2, order), orderBook.getBidOrders());
     }
 
     @Test
@@ -171,5 +165,24 @@ class OrderBookImplTest {
                 UnknownOrderIdException.class,
                 () -> orderBook.cancelOrder(id),
                 "Unknown order id \"" + id + "\" is given");
+    }
+
+    @Test
+    public void testCancelAndAddOrderWithSameId() throws Exception {
+        final long id = OrderIdCounter.get();
+        final Order order =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(100L)
+                        .withQuantity(10L)
+                        .withSide(Side.ASK)
+                        .build();
+
+        orderBook.addOrder(order);
+
+        orderBook.cancelOrder(id);
+        orderBook.addOrder(order);
+
+        assertIterableEquals(Collections.singletonList(order), orderBook.getAskOrders());
     }
 }
