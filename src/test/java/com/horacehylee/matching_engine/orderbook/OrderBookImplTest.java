@@ -4,6 +4,7 @@ import com.horacehylee.matching_engine.OrderIdCounter;
 import com.horacehylee.matching_engine.domain.Order;
 import com.horacehylee.matching_engine.domain.Side;
 import com.horacehylee.matching_engine.orderbook.exception.DuplicateOrderIdException;
+import com.horacehylee.matching_engine.orderbook.exception.UnknownOrderIdException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -26,7 +28,7 @@ class OrderBookImplTest {
 
     @Test
     public void testAddAskOrder() throws Exception {
-        Order order =
+        final Order order =
                 Order.Builder.anOrder()
                         .withOrderId(OrderIdCounter.get())
                         .withPrice(100L)
@@ -36,16 +38,16 @@ class OrderBookImplTest {
 
         orderBook.addOrder(order);
 
-        List<Order> askOrders = orderBook.getAskOrders();
-        List<Order> bidOrders = orderBook.getBidOrders();
+        final List<Order> askOrders = orderBook.getAskOrders();
+        final List<Order> bidOrders = orderBook.getBidOrders();
 
-        assertIterableEquals(askOrders, Collections.singletonList(order));
-        assertIterableEquals(bidOrders, Collections.emptyList());
+        assertIterableEquals(Collections.singletonList(order), askOrders);
+        assertIterableEquals(Collections.emptyList(), bidOrders);
     }
 
     @Test
     public void testAddAskOrderInOrder() throws Exception {
-        Order order =
+        final Order order =
                 Order.Builder.anOrder()
                         .withOrderId(OrderIdCounter.get())
                         .withPrice(100L)
@@ -53,7 +55,7 @@ class OrderBookImplTest {
                         .withSide(Side.ASK)
                         .build();
 
-        Order order2 =
+        final Order order2 =
                 Order.Builder.anOrder()
                         .withOrderId(OrderIdCounter.get())
                         .withPrice(100L)
@@ -64,14 +66,14 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        List<Order> askOrders = orderBook.getAskOrders();
-        assertIterableEquals(askOrders, Arrays.asList(order, order2));
+        final List<Order> askOrders = orderBook.getAskOrders();
+        assertIterableEquals(Arrays.asList(order, order2), askOrders);
     }
 
     @Test
     public void testInvalidAddWithSameOrderId() throws Exception {
-        long id = OrderIdCounter.get();
-        Order order =
+        final long id = OrderIdCounter.get();
+        final Order order =
                 Order.Builder.anOrder()
                         .withOrderId(id)
                         .withPrice(100L)
@@ -79,7 +81,7 @@ class OrderBookImplTest {
                         .withSide(Side.ASK)
                         .build();
 
-        Order order2 =
+        final Order order2 =
                 Order.Builder.anOrder()
                         .withOrderId(id)
                         .withPrice(100L)
@@ -97,7 +99,7 @@ class OrderBookImplTest {
 
     @Test
     public void testAddAskOrderOfDiffPrices_OrdersInAscendingOrder() throws Exception {
-        Order order =
+        final Order order =
                 Order.Builder.anOrder()
                         .withOrderId(OrderIdCounter.get())
                         .withPrice(200L)
@@ -105,7 +107,7 @@ class OrderBookImplTest {
                         .withSide(Side.ASK)
                         .build();
 
-        Order order2 =
+        final Order order2 =
                 Order.Builder.anOrder()
                         .withOrderId(OrderIdCounter.get())
                         .withPrice(100L)
@@ -116,13 +118,13 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        List<Order> askOrders = orderBook.getAskOrders();
-        assertIterableEquals(askOrders, Arrays.asList(order2, order));
+        final List<Order> askOrders = orderBook.getAskOrders();
+        assertIterableEquals(Arrays.asList(order2, order), askOrders);
     }
 
     @Test
     public void testAddBidOrderOfDiffPrices_OrdersInDescendingOrder() throws Exception {
-        Order order =
+        final Order order =
                 Order.Builder.anOrder()
                         .withOrderId(OrderIdCounter.get())
                         .withPrice(100L)
@@ -130,7 +132,7 @@ class OrderBookImplTest {
                         .withSide(Side.BID)
                         .build();
 
-        Order order2 =
+        final Order order2 =
                 Order.Builder.anOrder()
                         .withOrderId(OrderIdCounter.get())
                         .withPrice(200L)
@@ -141,7 +143,33 @@ class OrderBookImplTest {
         orderBook.addOrder(order);
         orderBook.addOrder(order2);
 
-        List<Order> bidOrders = orderBook.getBidOrders();
-        assertIterableEquals(bidOrders, Arrays.asList(order2, order));
+        final List<Order> bidOrders = orderBook.getBidOrders();
+        assertIterableEquals(Arrays.asList(order2, order), bidOrders);
+    }
+
+    @Test
+    public void testCancelOrder() throws Exception {
+        final long id = OrderIdCounter.get();
+        final Order order =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(100L)
+                        .withQuantity(10L)
+                        .withSide(Side.ASK)
+                        .build();
+
+        orderBook.addOrder(order);
+        orderBook.cancelOrder(id);
+
+        assertEquals(0, orderBook.getAskOrders().size());
+    }
+
+    @Test
+    public void testInvalidCancelOrderWithUnknownOrderId() {
+        final long id = OrderIdCounter.get();
+        assertThrows(
+                UnknownOrderIdException.class,
+                () -> orderBook.cancelOrder(id),
+                "Unknown order id \"" + id + "\" is given");
     }
 }

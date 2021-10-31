@@ -3,6 +3,7 @@ package com.horacehylee.matching_engine.orderbook;
 import com.horacehylee.matching_engine.domain.Order;
 import com.horacehylee.matching_engine.domain.Side;
 import com.horacehylee.matching_engine.orderbook.exception.DuplicateOrderIdException;
+import com.horacehylee.matching_engine.orderbook.exception.UnknownOrderIdException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 
@@ -37,19 +38,44 @@ public class OrderBookImpl implements IOrderBook {
 
     @Override
     public void addOrder(Order order) throws DuplicateOrderIdException {
-        long orderId = order.getOrderId();
-        long price = order.getPrice();
-        Side side = order.getSide();
+        final long orderId = order.getOrderId();
+        final long price = order.getPrice();
+        final Side side = order.getSide();
 
         if (orderIdMap.containsKey(orderId)) {
             throw new DuplicateOrderIdException(orderId);
         }
-        getOrdersBucketBySide(side).computeIfAbsent(price, OrdersBucket::new).addOrder(order);
+        getOrdersBucketBySide(side).computeIfAbsent(price, OrdersBucket::new).add(order);
         orderIdMap.put(order.getOrderId(), order);
     }
 
     @Override
-    public void cancelOrder(long orderId) {}
+    public void cancelOrder(final long orderId) throws UnknownOrderIdException {
+        // TODO: handle cases where order is already partially filled
+        if (!orderIdMap.containsKey(orderId)) {
+            throw new UnknownOrderIdException(orderId);
+        }
+        final Order order = orderIdMap.get(orderId);
+        final Side side = order.getSide();
+        final long price = order.getPrice();
+
+        orderIdMap.remove(orderId);
+
+        NavigableMap<Long, OrdersBucket> ordersBuckets = getOrdersBucketBySide(side);
+        OrdersBucket ordersBucket = ordersBuckets.get(price);
+        if (ordersBucket == null) {
+            throw new IllegalStateException(
+                    "Orders bucket could not be found for "
+                            + price
+                            + " price for cancelling order "
+                            + orderId);
+        }
+        ordersBucket.remove(order);
+
+        if (ordersBucket.getVolume() == 0) {
+            ordersBuckets.remove(price);
+        }
+    }
 
     @Override
     public void changeOrderPrice(long orderId, long price) {}
@@ -60,14 +86,14 @@ public class OrderBookImpl implements IOrderBook {
     @Override
     public List<Order> getAskOrders() {
         return askOrdersBuckets.values().stream()
-                .flatMap(bucket -> bucket.getOrders().stream())
+                .flatMap(bucket -> bucket.getAll().stream())
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<Order> getBidOrders() {
         return bidOrdersBuckets.values().stream()
-                .flatMap(bucket -> bucket.getOrders().stream())
+                .flatMap(bucket -> bucket.getAll().stream())
                 .collect(Collectors.toList());
     }
 
@@ -76,9 +102,9 @@ public class OrderBookImpl implements IOrderBook {
     }
 
     private static class OrdersBucket implements Comparable<OrdersBucket> {
-
         private final long price;
         private final LinkedHashMap<Long, Order> orders;
+        private long volume = 0;
 
         private OrdersBucket(long price) {
             this.price = price;
@@ -90,13 +116,23 @@ public class OrderBookImpl implements IOrderBook {
             return Long.compare(this.price, o.price);
         }
 
-        public void addOrder(Order order) {
+        public void add(Order order) {
             orders.put(order.getOrderId(), order);
+            volume += order.getQuantity();
+        }
+
+        public void remove(Order order) {
+            orders.remove(order.getOrderId());
+            volume -= order.getQuantity();
         }
 
         @TestOnly
-        public List<Order> getOrders() {
+        public List<Order> getAll() {
             return List.copyOf(orders.values());
+        }
+
+        public long getVolume() {
+            return volume;
         }
     }
 }
