@@ -63,6 +63,10 @@ public class Order {
         return quantity;
     }
 
+    public Side getSide() {
+        return side;
+    }
+
     public boolean isBid() {
         return Side.BID.equals(side);
     }

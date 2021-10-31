@@ -1,6 +1,7 @@
 package com.horacehylee.matching_engine.orderbook;
 
 import com.horacehylee.matching_engine.domain.Order;
+import com.horacehylee.matching_engine.domain.Side;
 import com.horacehylee.matching_engine.orderbook.exception.DuplicateOrderIdException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
@@ -35,24 +36,15 @@ public class OrderBookImpl implements IOrderBook {
 
     @Override
     public void addOrder(Order order) throws DuplicateOrderIdException {
-        if (orderIdMap.containsKey(order.getOrderId())) {
-            throw new DuplicateOrderIdException(order.getOrderId());
+        long orderId = order.getOrderId();
+        long price = order.getPrice();
+        Side side = order.getSide();
+
+        if (orderIdMap.containsKey(orderId)) {
+            throw new DuplicateOrderIdException(orderId);
         }
-        NavigableMap<Long, OrdersBucket> ordersBuckets = bidOrdersBuckets;
-        if (order.isAsk()) {
-            ordersBuckets = askOrdersBuckets;
-        }
-        ordersBuckets.compute(
-                order.getPrice(),
-                (price, prevBucket) -> {
-                    OrdersBucket bucket = prevBucket;
-                    if (bucket == null) {
-                        bucket = new OrdersBucket(order.getPrice());
-                    }
-                    bucket.addOrder(order);
-                    orderIdMap.put(order.getOrderId(), order);
-                    return bucket;
-                });
+        getOrdersBucketBySide(side).computeIfAbsent(price, OrdersBucket::new).addOrder(order);
+        orderIdMap.put(order.getOrderId(), order);
     }
 
     @Override
@@ -78,7 +70,11 @@ public class OrderBookImpl implements IOrderBook {
                 .collect(Collectors.toList());
     }
 
-    private class OrdersBucket implements Comparable<OrdersBucket> {
+    private NavigableMap<Long, OrdersBucket> getOrdersBucketBySide(Side side) {
+        return side == Side.BID ? bidOrdersBuckets : askOrdersBuckets;
+    }
+
+    private static class OrdersBucket implements Comparable<OrdersBucket> {
 
         private final long price;
         private final LinkedHashMap<Long, Order> orders;
