@@ -9,13 +9,14 @@ import com.horacehylee.matching_engine.orderbook.exception.UnknownPriceException
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OrderBookImplTest {
 
@@ -29,9 +30,10 @@ class OrderBookImplTest {
 
     @Test
     public void testAddAskOrder() throws Exception {
+        final long id = OrderIdCounter.get();
         final Order order =
                 Order.Builder.anOrder()
-                        .withOrderId(OrderIdCounter.get())
+                        .withOrderId(id)
                         .withPrice(100L)
                         .withQuantity(10L)
                         .withSide(Side.ASK)
@@ -41,6 +43,9 @@ class OrderBookImplTest {
 
         assertIterableEquals(List.of(order), orderBook.getAskOrders());
         assertIterableEquals(Collections.emptyList(), orderBook.getBidOrders());
+
+        assertTrue(orderBook.containsOrder(id));
+        assertFalse(orderBook.containsOrder(OrderIdCounter.get()));
     }
 
     @Test

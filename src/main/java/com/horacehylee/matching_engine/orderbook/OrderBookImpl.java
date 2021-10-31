@@ -132,6 +132,11 @@ public class OrderBookImpl implements IOrderBook {
     }
 
     @Override
+    public boolean containsOrder(long orderId) {
+        return orderIdMap.containsKey(orderId);
+    }
+
+    @Override
     public IOrderBookSlice getSlice(long price) throws UnknownPriceException {
         OrdersBucket ordersBucket;
         Side side;

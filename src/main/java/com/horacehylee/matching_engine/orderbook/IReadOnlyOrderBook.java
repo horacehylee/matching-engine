@@ -22,6 +22,8 @@ public interface IReadOnlyOrderBook {
 
     Order getOrder(long orderId) throws UnknownOrderIdException;
 
+    boolean containsOrder(long orderId);
+
     /**
      * Get slice of OrderBook
      * @param price to be searched
