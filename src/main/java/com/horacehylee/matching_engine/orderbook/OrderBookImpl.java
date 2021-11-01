@@ -211,34 +211,6 @@ public class OrderBookImpl implements IOrderBook {
                 ordersBucket.getOrders().collect(Collectors.toUnmodifiableList()));
     }
 
-    private void fillOrder(
-            Map.Entry<Long, Order> entry,
-            OrdersBucket ordersBucket,
-            Iterator<Map.Entry<Long, Order>> iterator,
-            long filled) {
-        final Order order = entry.getValue();
-        // TODO: have trade event
-        final long orderId = order.getOrderId();
-        final long remainingQuantity = order.getRemainingQuantity();
-        if (filled == remainingQuantity) {
-            orderIdMap.remove(orderId);
-            ordersBucket.remove(iterator, order);
-
-        } else if (filled < remainingQuantity) {
-            Order newOrder = Order.copyOfWithFilled(order, filled);
-            orderIdMap.replace(orderId, newOrder);
-            ordersBucket.replace(entry, newOrder);
-        } else {
-            throw new IllegalStateException(
-                    "Fill order should not have filled ("
-                            + filled
-                            + ") > remaining quantity ("
-                            + remainingQuantity
-                            + ") for order "
-                            + orderId);
-        }
-    }
-
     private NavigableMap<Long, OrdersBucket> getOrdersBucketBySide(Side side) {
         return side == Side.BID ? bidOrdersBuckets : askOrdersBuckets;
     }
