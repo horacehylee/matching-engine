@@ -46,12 +46,26 @@ public class OrderBookImpl implements IOrderBook {
             throw new DuplicateOrderIdException(orderId);
         }
 
+        final Side side = order.getSide();
+        final long price = order.getPrice();
+        final long quantity = order.getQuantity();
+
+        final long filled = getMatchedFilledQuantity(order);
+        if (filled == quantity) {
+            return;
+        } else if (filled > 0) {
+            order = Order.copyOfWithFilled(order, filled);
+        }
+
+        getOrdersBucketBySide(side).computeIfAbsent(price, OrdersBucket::new).add(order);
+        orderIdMap.put(order.getOrderId(), order);
+    }
+
+    private long getMatchedFilledQuantity(Order order) {
         final long price = order.getPrice();
         final Side side = order.getSide();
-
-        // try matching
-        // TODO: refactor this
         final long quantity = order.getQuantity();
+
         long quantityLeft = quantity;
         final NavigableMap<Long, OrdersBucket> oppositeSubBuckets =
                 getOrdersBucketBySide(side.getOpposite()).headMap(price, true);
@@ -59,39 +73,35 @@ public class OrderBookImpl implements IOrderBook {
         for (Iterator<Map.Entry<Long, OrdersBucket>> bucketsIterator =
                         oppositeSubBuckets.entrySet().iterator();
                 bucketsIterator.hasNext(); ) {
-            Map.Entry<Long, OrdersBucket> bucketsEntry = bucketsIterator.next();
-            OrdersBucket ordersBucket = bucketsEntry.getValue();
+            OrdersBucket ordersBucket = bucketsIterator.next().getValue();
 
-            for (Iterator<Map.Entry<Long, Order>> it = ordersBucket.getIterator(); it.hasNext(); ) {
-                final Map.Entry<Long, Order> entry = it.next();
+            for (Iterator<Map.Entry<Long, Order>> ordersIterator = ordersBucket.getIterator();
+                    ordersIterator.hasNext(); ) {
+                final Map.Entry<Long, Order> entry = ordersIterator.next();
                 final Order oppositeOrder = entry.getValue();
+
                 final long oppositeOrderId = oppositeOrder.getOrderId();
                 final long remainingQuantity = oppositeOrder.getRemainingQuantity();
                 final long filled = Math.min(quantityLeft, remainingQuantity);
                 if (filled == remainingQuantity) {
                     orderIdMap.remove(oppositeOrderId);
-                    ordersBucket.remove(it, oppositeOrder);
+                    ordersBucket.remove(ordersIterator, oppositeOrder);
+                    if (ordersBucket.getVolume() == 0) {
+                        bucketsIterator.remove();
+                    }
                 } else {
                     Order newOrder = Order.copyOfWithFilled(oppositeOrder, filled);
                     orderIdMap.replace(oppositeOrderId, newOrder);
                     ordersBucket.replace(entry, newOrder);
                 }
-                if (ordersBucket.getVolume() == 0) {
-                    bucketsIterator.remove();
-                }
                 quantityLeft -= filled;
                 if (quantityLeft == 0) {
                     // TODO: trade event
-                    return;
+                    return quantity;
                 }
             }
         }
-        if (quantityLeft != quantity) {
-            order = Order.copyOfWithFilled(order, quantity - quantityLeft);
-        }
-
-        getOrdersBucketBySide(side).computeIfAbsent(price, OrdersBucket::new).add(order);
-        orderIdMap.put(order.getOrderId(), order);
+        return quantity - quantityLeft;
     }
 
     @Override
