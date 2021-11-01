@@ -48,13 +48,14 @@ public class OrderBookImpl implements IOrderBook {
 
         final long price = order.getPrice();
         final Side side = order.getSide();
-        final long quantity = order.getQuantity();
 
         // try matching
         // TODO: refactor this
+        final long quantity = order.getQuantity();
         long quantityLeft = quantity;
         final NavigableMap<Long, OrdersBucket> oppositeSubBuckets =
                 getOrdersBucketBySide(side.getOpposite()).headMap(price, true);
+
         for (Iterator<Map.Entry<Long, OrdersBucket>> bucketsIterator =
                         oppositeSubBuckets.entrySet().iterator();
                 bucketsIterator.hasNext(); ) {
@@ -64,8 +65,17 @@ public class OrderBookImpl implements IOrderBook {
             for (Iterator<Map.Entry<Long, Order>> it = ordersBucket.getIterator(); it.hasNext(); ) {
                 final Map.Entry<Long, Order> entry = it.next();
                 final Order oppositeOrder = entry.getValue();
-                final long filled = Math.min(quantityLeft, oppositeOrder.getRemainingQuantity());
-                fillOrder(entry, ordersBucket, it, filled);
+                final long oppositeOrderId = oppositeOrder.getOrderId();
+                final long remainingQuantity = oppositeOrder.getRemainingQuantity();
+                final long filled = Math.min(quantityLeft, remainingQuantity);
+                if (filled == remainingQuantity) {
+                    orderIdMap.remove(oppositeOrderId);
+                    ordersBucket.remove(it, oppositeOrder);
+                } else {
+                    Order newOrder = Order.copyOfWithFilled(oppositeOrder, filled);
+                    orderIdMap.replace(oppositeOrderId, newOrder);
+                    ordersBucket.replace(entry, newOrder);
+                }
                 if (ordersBucket.getVolume() == 0) {
                     bucketsIterator.remove();
                 }
