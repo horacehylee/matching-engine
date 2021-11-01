@@ -308,4 +308,44 @@ class OrderBookImplTest {
         final IOrderBookSlice slice = orderBook.getSlice(price);
         assertEquals(newQuantity, slice.getVolume());
     }
+
+    @Test
+    public void testChangeOrderQuantityPreserveOrdering() throws Exception {
+        final long id = OrderIdCounter.get();
+        final long originalQuantity = 10L;
+        final long newQuantity = 5L;
+        final long price = 100L;
+
+        final Order order =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(price)
+                        .withQuantity(originalQuantity)
+                        .withSide(Side.ASK)
+                        .build();
+        orderBook.addOrder(order);
+
+        final Order order2 = Order.Builder.anOrder()
+                .withOrderId(OrderIdCounter.get())
+                .withPrice(price)
+                .withQuantity(originalQuantity)
+                .withSide(Side.ASK)
+                .build();
+        orderBook.addOrder(order2);
+
+        orderBook.changeOrderQuantity(id, newQuantity);
+
+        final Order expectedOrder =
+                Order.Builder.anOrder()
+                        .withOrderId(id)
+                        .withPrice(price)
+                        .withQuantity(newQuantity)
+                        .withSide(Side.ASK)
+                        .build();
+        assertIterableEquals(List.of(expectedOrder, order2), orderBook.getAskOrders());
+        assertEquals(expectedOrder, orderBook.getOrder(id));
+
+        final IOrderBookSlice slice = orderBook.getSlice(price);
+        assertEquals(15L, slice.getVolume());
+    }
 }

@@ -9,24 +9,30 @@ public class Order {
     private final long price;
     private final long quantity;
     private final Side side;
+    private final long filled;
 
-    private Order(long orderId, long price, long quantity, Side side) {
+    private Order(long orderId, long price, long quantity, Side side, long filled) {
         this.orderId = orderId;
         this.price = price;
         this.quantity = quantity;
         this.side = side;
+        this.filled = filled;
     }
 
-    public static Order of(long orderId, long price, long quantity, Side side) {
-        return new Order(orderId, price, quantity, side);
+    public static Order of(long orderId, long price, long quantity, Side side, long filled) {
+        return new Order(orderId, price, quantity, side, filled);
     }
 
-    public static Order copyOfExceptPrice(Order other, long price) {
-        return new Order(other.orderId, price, other.quantity, other.side);
+    public static Order copyOfWithPrice(Order other, long price) {
+        return new Order(other.orderId, price, other.quantity, other.side, other.filled);
     }
 
-    public static Order copyOfExceptQuantity(Order other, long quantity) {
-        return new Order(other.orderId, other.price, quantity, other.side);
+    public static Order copyOfWithQuantity(Order other, long quantity) {
+        return new Order(other.orderId, other.price, quantity, other.side, other.filled);
+    }
+
+    public static Order copyOfWithFilled(Order other, long filled) {
+        return new Order(other.orderId, other.price, other.quantity, other.side, filled);
     }
 
     @Override
@@ -40,6 +46,8 @@ public class Order {
                 + quantity
                 + ", side="
                 + side
+                + ", filled="
+                + filled
                 + '}';
     }
 
@@ -51,12 +59,13 @@ public class Order {
         return orderId == order.orderId
                 && price == order.price
                 && quantity == order.quantity
+                && filled == order.filled
                 && side == order.side;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(orderId, price, quantity, side);
+        return Objects.hash(orderId, price, quantity, side, filled);
     }
 
     public long getOrderId() {
@@ -75,12 +84,12 @@ public class Order {
         return side;
     }
 
-    public boolean isBid() {
-        return Side.BID.equals(side);
+    public long getFilled() {
+        return filled;
     }
 
-    public boolean isAsk() {
-        return Side.ASK.equals(side);
+    public long getRemainingQuantity() {
+        return quantity - filled;
     }
 
     @TestOnly
@@ -89,6 +98,7 @@ public class Order {
         private long price;
         private long quantity;
         private Side side;
+        private long filled;
 
         private Builder() {}
 
@@ -116,8 +126,13 @@ public class Order {
             return this;
         }
 
+        public Builder withFilled(long filled) {
+            this.filled = filled;
+            return this;
+        }
+
         public Order build() {
-            return new Order(orderId, price, quantity, side);
+            return new Order(orderId, price, quantity, side, filled);
         }
     }
 }

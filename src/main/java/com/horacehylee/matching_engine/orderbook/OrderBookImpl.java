@@ -6,15 +6,18 @@ import com.horacehylee.matching_engine.orderbook.exception.DuplicateOrderIdExcep
 import com.horacehylee.matching_engine.orderbook.exception.UnknownOrderIdException;
 import com.horacehylee.matching_engine.orderbook.exception.UnknownPriceException;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.TestOnly;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class OrderBookImpl implements IOrderBook {
 
@@ -39,19 +42,50 @@ public class OrderBookImpl implements IOrderBook {
     @Override
     public void addOrder(Order order) throws DuplicateOrderIdException {
         final long orderId = order.getOrderId();
-        final long price = order.getPrice();
-        final Side side = order.getSide();
-
         if (orderIdMap.containsKey(orderId)) {
             throw new DuplicateOrderIdException(orderId);
         }
+
+        final long price = order.getPrice();
+        final Side side = order.getSide();
+        final long quantity = order.getQuantity();
+
+        // try matching
+        // TODO: refactor this
+        long quantityLeft = quantity;
+        final NavigableMap<Long, OrdersBucket> oppositeSubBuckets =
+                getOrdersBucketBySide(side.getOpposite()).headMap(price, true);
+        for (Iterator<Map.Entry<Long, OrdersBucket>> bucketsIterator =
+                        oppositeSubBuckets.entrySet().iterator();
+                bucketsIterator.hasNext(); ) {
+            Map.Entry<Long, OrdersBucket> bucketsEntry = bucketsIterator.next();
+            OrdersBucket ordersBucket = bucketsEntry.getValue();
+
+            for (Iterator<Map.Entry<Long, Order>> it = ordersBucket.getIterator(); it.hasNext(); ) {
+                final Map.Entry<Long, Order> entry = it.next();
+                final Order oppositeOrder = entry.getValue();
+                final long filled = Math.min(quantityLeft, oppositeOrder.getRemainingQuantity());
+                fillOrder(entry, ordersBucket, it, filled);
+                if (ordersBucket.getVolume() == 0) {
+                    bucketsIterator.remove();
+                }
+                quantityLeft -= filled;
+                if (quantityLeft == 0) {
+                    // TODO: trade event
+                    return;
+                }
+            }
+        }
+        if (quantityLeft != quantity) {
+            order = Order.copyOfWithFilled(order, quantity - quantityLeft);
+        }
+
         getOrdersBucketBySide(side).computeIfAbsent(price, OrdersBucket::new).add(order);
         orderIdMap.put(order.getOrderId(), order);
     }
 
     @Override
     public void cancelOrder(final long orderId) throws UnknownOrderIdException {
-        // TODO: handle cases where order is already partially filled
         final Order order = getOrderById(orderId);
         final Side side = order.getSide();
         final long price = order.getPrice();
@@ -68,7 +102,6 @@ public class OrderBookImpl implements IOrderBook {
                             + orderId);
         }
         ordersBucket.remove(order);
-
         if (ordersBucket.getVolume() == 0) {
             ordersBuckets.remove(price);
         }
@@ -79,7 +112,7 @@ public class OrderBookImpl implements IOrderBook {
         final Order originalOrder = getOrderById(orderId);
         cancelOrder(orderId);
 
-        final Order order = Order.copyOfExceptPrice(originalOrder, price);
+        final Order order = Order.copyOfWithPrice(originalOrder, price);
         try {
             addOrder(order);
         } catch (DuplicateOrderIdException e) {
@@ -94,7 +127,7 @@ public class OrderBookImpl implements IOrderBook {
         final Side side = originalOrder.getSide();
         final long price = originalOrder.getPrice();
 
-        final Order order = Order.copyOfExceptQuantity(originalOrder, quantity);
+        final Order order = Order.copyOfWithQuantity(originalOrder, quantity);
 
         NavigableMap<Long, OrdersBucket> ordersBuckets = getOrdersBucketBySide(side);
         OrdersBucket ordersBucket = ordersBuckets.get(price);
@@ -106,23 +139,25 @@ public class OrderBookImpl implements IOrderBook {
                             + orderId);
         }
 
-        orderIdMap.put(orderId, order);
+        orderIdMap.replace(orderId, order);
 
-        ordersBucket.remove(originalOrder);
-        ordersBucket.add(order);
+        ordersBucket.replace(originalOrder, order);
+        if (ordersBucket.getVolume() == 0) {
+            ordersBuckets.remove(price);
+        }
     }
 
     @Override
     public List<Order> getAskOrders() {
         return askOrdersBuckets.values().stream()
-                .flatMap(bucket -> bucket.getOrders().stream())
+                .flatMap(OrdersBucket::getOrders)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<Order> getBidOrders() {
         return bidOrdersBuckets.values().stream()
-                .flatMap(bucket -> bucket.getOrders().stream())
+                .flatMap(OrdersBucket::getOrders)
                 .collect(Collectors.toList());
     }
 
@@ -149,7 +184,39 @@ public class OrderBookImpl implements IOrderBook {
         } else {
             throw new UnknownPriceException(price);
         }
-        return new OrderBookSlice(side, price, ordersBucket.getVolume(), ordersBucket.getOrders());
+        return new OrderBookSlice(
+                side,
+                price,
+                ordersBucket.getVolume(),
+                ordersBucket.getOrders().collect(Collectors.toUnmodifiableList()));
+    }
+
+    private void fillOrder(
+            Map.Entry<Long, Order> entry,
+            OrdersBucket ordersBucket,
+            Iterator<Map.Entry<Long, Order>> iterator,
+            long filled) {
+        final Order order = entry.getValue();
+        // TODO: have trade event
+        final long orderId = order.getOrderId();
+        final long remainingQuantity = order.getRemainingQuantity();
+        if (filled == remainingQuantity) {
+            orderIdMap.remove(orderId);
+            ordersBucket.remove(iterator, order);
+
+        } else if (filled < remainingQuantity) {
+            Order newOrder = Order.copyOfWithFilled(order, filled);
+            orderIdMap.replace(orderId, newOrder);
+            ordersBucket.replace(entry, newOrder);
+        } else {
+            throw new IllegalStateException(
+                    "Fill order should not have filled ("
+                            + filled
+                            + ") > remaining quantity ("
+                            + remainingQuantity
+                            + ") for order "
+                            + orderId);
+        }
     }
 
     private NavigableMap<Long, OrdersBucket> getOrdersBucketBySide(Side side) {
@@ -182,16 +249,36 @@ public class OrderBookImpl implements IOrderBook {
 
         public void add(Order order) {
             orders.put(order.getOrderId(), order);
-            volume += order.getQuantity();
+            volume += order.getRemainingQuantity();
         }
 
         public void remove(Order order) {
             orders.remove(order.getOrderId());
-            volume -= order.getQuantity();
+            volume -= order.getRemainingQuantity();
         }
 
-        public List<Order> getOrders() {
-            return List.copyOf(orders.values());
+        public void remove(Iterator<Map.Entry<Long, Order>> iterator, Order order) {
+            iterator.remove();
+            volume -= order.getRemainingQuantity();
+        }
+
+        public void replace(Order originalOrder, Order newOrder) {
+            orders.replace(originalOrder.getOrderId(), newOrder);
+            volume += newOrder.getRemainingQuantity() - originalOrder.getRemainingQuantity();
+        }
+
+        public void replace(Map.Entry<Long, Order> entry, Order newOrder) {
+            final Order originalOrder = entry.getValue();
+            entry.setValue(newOrder);
+            volume += newOrder.getRemainingQuantity() - originalOrder.getRemainingQuantity();
+        }
+
+        public Stream<Order> getOrders() {
+            return orders.values().stream();
+        }
+
+        public Iterator<Map.Entry<Long, Order>> getIterator() {
+            return orders.entrySet().iterator();
         }
 
         public long getVolume() {
@@ -231,6 +318,21 @@ public class OrderBookImpl implements IOrderBook {
         @Override
         public long getVolume() {
             return volume;
+        }
+
+        @TestOnly
+        @Override
+        public String toString() {
+            return "OrderBookSlice{"
+                    + "side="
+                    + side
+                    + ", price="
+                    + price
+                    + ", volume="
+                    + volume
+                    + ", orders="
+                    + orders
+                    + '}';
         }
     }
 }
